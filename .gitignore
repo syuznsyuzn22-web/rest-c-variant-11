@@ -1,0 +1,6 @@
+build/
+data/rest.db
+*.db
+.DS_Store
+CMakeCache.txt
+CMakeFiles/
