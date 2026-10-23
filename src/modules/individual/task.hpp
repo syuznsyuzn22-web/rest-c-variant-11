@@ -14,7 +14,6 @@
 // ПОДКЛЮЧИТЕ СВОЙ ВАРИАНТ ЗДЕСЬ (замените одну строку).
 // ────────────────────────────────────────────────────────────────────────────
 #include "variant_mine.hpp"
-// #include "variant_mine.hpp"
 
 namespace Individual {
     using namespace std;
@@ -28,7 +27,15 @@ namespace Individual {
             int uid = Auth::auth(req, role, name);
             if (!uid) { res.status = 401; return; }
 
-            auto in = TaskVariant::parse(req.body);
+            TaskVariant::Input in;
+            try {
+                in = TaskVariant::parse(req.body);
+            } catch (const std::exception& e) {
+                JObj o; o.str("error", e.what());
+                res.status = 400;
+                res.set_content(o.str(), "application/json");
+                return;
+            }
 
             string err = TaskVariant::validate(in);
             if (!err.empty()) {

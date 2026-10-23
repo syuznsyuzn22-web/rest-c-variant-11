@@ -4,3 +4,6 @@ data/rest.db
 .DS_Store
 CMakeCache.txt
 CMakeFiles/
+Makefile
+cmake_install.cmake
+rest_server

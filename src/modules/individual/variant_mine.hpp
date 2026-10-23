@@ -22,26 +22,49 @@ struct Output {
     double final_delivery_cost;
 };
 
-static double extract_double(const std::string& json, const std::string& key) {
-    std::string search = "\"" + key + "\":";
+static size_t find_value(const std::string& json, const std::string& key) {
+    std::string search = "\"" + key + "\"";
     size_t pos = json.find(search);
     if (pos == std::string::npos) throw std::runtime_error("Missing key: " + key);
     pos += search.length();
-    while (pos < json.length() && (json[pos] == ' ' || json[pos] == '\t')) pos++;
+    while (pos < json.size() && std::isspace(static_cast<unsigned char>(json[pos]))) pos++;
+    if (pos >= json.size() || json[pos] != ':') throw std::runtime_error("Invalid JSON near key: " + key);
+    pos++;
+    while (pos < json.size() && std::isspace(static_cast<unsigned char>(json[pos]))) pos++;
+    return pos;
+}
+
+static double extract_double(const std::string& json, const std::string& key) {
+    size_t pos = find_value(json, key);
     size_t end = pos;
-    while (end < json.length() && (std::isdigit(static_cast<unsigned char>(json[end])) || json[end] == '.' || json[end] == '-' || json[end] == 'e' || json[end] == 'E' || json[end] == '+')) end++;
-    return std::stod(json.substr(pos, end - pos));
+    while (end < json.size() && (std::isdigit(static_cast<unsigned char>(json[end])) ||
+           json[end] == '.' || json[end] == '-' || json[end] == 'e' ||
+           json[end] == 'E' || json[end] == '+')) end++;
+    if (end == pos) throw std::runtime_error(key + " must be a number");
+    try {
+        size_t used = 0;
+        double v = std::stod(json.substr(pos, end - pos), &used);
+        if (used != end - pos) throw std::runtime_error(key + " must be a valid number");
+        return v;
+    } catch (const std::logic_error&) {
+        throw std::runtime_error(key + " must be a valid number");
+    }
 }
 
 static int extract_int(const std::string& json, const std::string& key) {
-    std::string search = "\"" + key + "\":";
-    size_t pos = json.find(search);
-    if (pos == std::string::npos) throw std::runtime_error("Missing key: " + key);
-    pos += search.length();
-    while (pos < json.length() && (json[pos] == ' ' || json[pos] == '\t')) pos++;
+    size_t pos = find_value(json, key);
     size_t end = pos;
-    while (end < json.length() && (std::isdigit(static_cast<unsigned char>(json[end])) || json[end] == '-')) end++;
-    return std::stoi(json.substr(pos, end - pos));
+    if (end < json.size() && json[end] == '-') end++;
+    size_t digits = end;
+    while (end < json.size() && std::isdigit(static_cast<unsigned char>(json[end]))) end++;
+    if (end == digits) throw std::runtime_error(key + " must be an integer");
+    if (end < json.size() && (json[end] == '.' || json[end] == 'e' || json[end] == 'E'))
+        throw std::runtime_error(key + " must be an integer");
+    try {
+        return std::stoi(json.substr(pos, end - pos));
+    } catch (const std::logic_error&) {
+        throw std::runtime_error(key + " is out of range");
+    }
 }
 
 inline Input parse(const std::string& json) {
@@ -56,7 +79,6 @@ inline Input parse(const std::string& json) {
     return input;
 }
 
-// ИСПРАВЛЕНО: теперь возвращает std::string (пустую строку при успехе)
 inline std::string validate(const Input& input) {
     if (input.length < 1.0 || input.length > 300.0) return "length must be in [1.0, 300.0]";
     if (input.width < 1.0 || input.width > 300.0) return "width must be in [1.0, 300.0]";
@@ -65,7 +87,7 @@ inline std::string validate(const Input& input) {
     if (input.distance_km < 1.0 || input.distance_km > 12000.0) return "distance_km must be in [1.0, 12000.0]";
     if (input.fragility_index < 1 || input.fragility_index > 3) return "fragility_index must be in [1, 3]";
     if (input.base_tariff_per_km <= 0.0) return "base_tariff_per_km must be > 0.0";
-    return ""; // Пустая строка означает, что ошибок нет
+    return "";
 }
 
 inline Output calculate(const Input& input) {
